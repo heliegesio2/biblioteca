@@ -1,3 +1,5 @@
+using Biblioteca.Api.Features.Audit;
+using Biblioteca.Api.Features.Catalog;
 using Biblioteca.Api.Infrastructure.Cqrs;
 using Biblioteca.Api.Infrastructure.Http;
 using Biblioteca.Api.Infrastructure.Observability;
@@ -22,6 +24,8 @@ builder.Services.AddCqrs(apiAssembly);
 builder.Services.AddValidatorsFromAssembly(apiAssembly);
 builder.Services.AddBibliotecaProblemDetails();
 builder.Services.AddSingleton(TimeProvider.System);
+builder.Services.AddScoped<ICorrelationIdAccessor, CorrelationIdAccessor>();
+builder.Services.AddScoped<IAuditWriter, AuditWriter>();
 
 var app = builder.Build();
 
@@ -34,6 +38,8 @@ if (app.Environment.IsDevelopment())
 app.UseMiddleware<CorrelationIdMiddleware>();
 app.UseExceptionHandler();
 app.UseHttpsRedirection();
+
+app.MapCatalogEndpoints();
 
 app.Run();
 

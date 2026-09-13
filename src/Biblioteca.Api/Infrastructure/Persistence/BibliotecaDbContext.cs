@@ -1,3 +1,4 @@
+using Biblioteca.Api.Features.Audit.Domain;
 using Biblioteca.Api.Features.Catalog.Domain;
 using Biblioteca.Api.Features.Loans.Domain;
 using Biblioteca.Api.Features.Users.Domain;
@@ -10,6 +11,7 @@ public sealed class BibliotecaDbContext(DbContextOptions<BibliotecaDbContext> op
     public DbSet<Book> Books => Set<Book>();
     public DbSet<User> Users => Set<User>();
     public DbSet<Loan> Loans => Set<Loan>();
+    public DbSet<AuditEvent> AuditEvents => Set<AuditEvent>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

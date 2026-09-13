@@ -18,4 +18,25 @@ public sealed record Error(string Code, string Title, string Detail, int HttpSta
         {
             ValidationErrors = errors,
         };
+
+    /// <summary>
+    /// Usado pelo TransactionCommandDecorator quando um UPDATE otimista (xmin) afeta 0
+    /// linhas — o recurso mudou desde que o cliente leu o ETag (docs/concurrency.md).
+    /// </summary>
+    public static Error PreconditionFailed() => new("precondition-failed", "Precondição falhou",
+        "O recurso foi alterado por outra requisição desde a última leitura (ETag desatualizado).",
+        StatusCodes.Status412PreconditionFailed);
+
+    /// <summary>PATCH sem If-Match — checado no endpoint, antes de despachar qualquer comando.</summary>
+    public static Error PreconditionRequired() => new("precondition-required", "If-Match obrigatório",
+        "Esta operação exige o cabeçalho If-Match com o ETag atual do recurso.",
+        StatusCodes.Status428PreconditionRequired);
+
+    /// <summary>
+    /// Rede de segurança genérica do TransactionCommandDecorator para violação de índice
+    /// único não prevista por uma checagem prévia no handler (a checagem prévia dá a
+    /// mensagem específica; isto cobre só a corrida rara entre a checagem e o commit).
+    /// </summary>
+    public static Error Conflict() => new("conflict", "Conflito de dados",
+        "A operação conflita com um registro já existente.", StatusCodes.Status409Conflict);
 }

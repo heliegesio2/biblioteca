@@ -1,4 +1,5 @@
 using Biblioteca.Api.Infrastructure.Persistence;
+using Microsoft.EntityFrameworkCore;
 using Npgsql;
 
 namespace Biblioteca.Api.Infrastructure.Cqrs.Decorators;
@@ -42,6 +43,22 @@ internal sealed class TransactionCommandDecorator<TCommand, TResult>(
 
                 return result;
             }
+            catch (DbUpdateConcurrencyException)
+            {
+                // xmin não bateu no UPDATE: alguém editou o recurso entre a leitura do
+                // cliente (ETag) e este PATCH. Só usado em edição de catálogo — ver
+                // docs/concurrency.md.
+                await transaction.RollbackAsync(CancellationToken.None);
+                return Result<TResult>.Failure(Error.PreconditionFailed());
+            }
+            catch (DbUpdateException ex) when (IsUniqueViolation(ex))
+            {
+                // Rede de segurança para a corrida rara entre a checagem prévia do
+                // handler (que dá a mensagem específica, ex. "isbn-already-exists") e o
+                // commit. Não é a garantia principal — o índice único é.
+                await transaction.RollbackAsync(CancellationToken.None);
+                return Result<TResult>.Failure(Error.Conflict());
+            }
             catch (Exception ex) when (IsTransient(ex) && attempt < MaxAttempts)
             {
                 await transaction.RollbackAsync(CancellationToken.None);
@@ -64,4 +81,7 @@ internal sealed class TransactionCommandDecorator<TCommand, TResult>(
     private static bool IsTransient(Exception ex) =>
         ex is PostgresException { SqlState: "40001" or "40P01" } ||
         ex.InnerException is PostgresException { SqlState: "40001" or "40P01" };
+
+    private static bool IsUniqueViolation(DbUpdateException ex) =>
+        ex.InnerException is PostgresException { SqlState: "23505" };
 }

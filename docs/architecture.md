@@ -119,8 +119,16 @@ Regras de dependência (verificadas por um teste de arquitetura):
 - `Features/*` pode usar `Infrastructure/*`; o contrário nunca acontece.
 - Um slice não referencia os tipos internos de outro slice. O que for compartilhado sobe
   para `Infrastructure/`.
-  Exceção declarada: `Loans` lê e escreve `Book.AvailableCopies` — na prática é o mesmo
-  agregado transacional, e fingir o contrário exigiria uma indireção inútil.
+  Exceções declaradas:
+  - `Loans` lê e escreve `Book.AvailableCopies` — na prática é o mesmo agregado
+    transacional, e fingir o contrário exigiria uma indireção inútil.
+  - `Catalog` lê `Loans` (status ativo) em três pontos: `DeactivateBook` precisa
+    recusar (`409 book-has-active-loans`) quando o livro tem empréstimo ativo,
+    `GetAvailability` conta empréstimos ativos para o campo `activeLoans`, e
+    `GetBookHistory` lista os empréstimos do livro. As três são leituras diretas via
+    `BibliotecaDbContext` (sem chamar handler ou domínio de `Loans`) — é a mesma
+    natureza da consulta que já atravessa tabelas livremente, não um acoplamento de
+    regra de negócio entre os dois slices.
 - `Features/*/Domain/*` não referencia `Microsoft.EntityFrameworkCore`, `HttpContext`
   nem `HybridCache`.
 - Um handler nunca chama outro handler. Lógica comum vai para o domínio.

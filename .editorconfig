@@ -34,3 +34,9 @@ indent_size = 2
 
 [*.md]
 trim_trailing_whitespace = false
+
+# Migrations e o model snapshot são gerados pelo `dotnet ef` — não seguem a convenção
+# de namespace file-scoped do resto do código, e não devem ser editados à mão.
+[src/Biblioteca.Api/Infrastructure/Persistence/Migrations/*.cs]
+generated_code = true
+csharp_style_namespace_declarations = block_scoped:none

@@ -24,6 +24,9 @@ appsettings.*.local.json
 # Ferramentas locais
 .claude/settings.local.json
 
+# Ajustes de Compose específicos desta máquina (ex.: porta ocupada por outro serviço)
+docker-compose.override.yml
+
 # SO
 Thumbs.db
 .DS_Store

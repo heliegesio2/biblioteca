@@ -9,10 +9,10 @@ Legenda: ✅ documentado e planejado · 🔨 em implementação · ✔ concluíd
 
 | Requisito | Implementação | Teste | Status |
 |---|---|---|---|
-| Criar, consultar, atualizar e listar livros | `POST/GET/PATCH /books`, `GET /books/{id}` | `CatalogTests` | ✅ |
-| Identificar por título, ISBN, autor e quantidade de exemplares | `Book` ([domain-model.md](domain-model.md#book)) | `BookTests` | ✅ |
-| Unicidade de ISBN | `UNIQUE INDEX ux_books_isbn` + normalização em `Isbn` | `CatalogTests.DuplicateIsbn_Returns409`, `IsbnTests` | ✅ |
-| Desativar ou rejeitar remoção de livro com histórico; histórico não pode ser apagado silenciosamente | `DELETE` = soft delete; `409` com empréstimo ativo; FK `ON DELETE RESTRICT` | `DeactivateBookTests` | ✅ |
+| Criar, consultar, atualizar e listar livros | `POST/GET/PATCH /books`, `GET /books/{id}` | `CatalogTests` | ✔ |
+| Identificar por título, ISBN, autor e quantidade de exemplares | `Book` ([domain-model.md](domain-model.md#book)) | `BookTests` | ✔ |
+| Unicidade de ISBN | `UNIQUE INDEX ux_books_isbn` + normalização em `Isbn` | `CatalogTests.CreateBook_IsbnDuplicado_Retorna409`, `IsbnTests` | ✔ |
+| Desativar ou rejeitar remoção de livro com histórico; histórico não pode ser apagado silenciosamente | `DELETE` = soft delete; `409` com empréstimo ativo; FK `ON DELETE RESTRICT` | `DeactivateBookTests` | ✔ |
 
 ## 2. Usuários e empréstimos
 
@@ -35,7 +35,7 @@ Legenda: ✅ documentado e planejado · 🔨 em implementação · ✔ concluíd
 | Nenhuma quantidade negativa, empréstimo duplicado ou estado inconsistente | `CHECK` + índice único parcial + transação única | idem + `CreateLoanTests.DuplicateActiveLoan` | ✅ |
 | Cenário automatizado em teste de integração | `LastCopyConcurrencyTests` com 20 requisições paralelas | — | ✅ |
 | Estratégia e trade-offs documentados no README | [README §8.1](../README.md#81-concorrência--o-último-exemplar) + [concurrency.md](concurrency.md) | — | ✅ |
-| **Não** usar `rowversion` | `xmin` (nativo do PostgreSQL) na edição de catálogo; `rowversion` descartado explicitamente | `UpdateBookConcurrencyTests` | ✅ |
+| **Não** usar `rowversion` | `xmin` (nativo do PostgreSQL) na edição de catálogo; `rowversion` descartado explicitamente | `UpdateBookConcurrencyTests` | ✔ |
 
 ## 4. Idempotência
 
@@ -115,8 +115,8 @@ Legenda: ✅ documentado e planejado · 🔨 em implementação · ✔ concluíd
 
 | Requisito | Teste | Status |
 |---|---|---|
-| Unitários das regras de negócio | `Biblioteca.UnitTests` | ✅ |
-| Integração com PostgreSQL real/containerizado | `Biblioteca.IntegrationTests` (Testcontainers) | ✅ |
+| Unitários das regras de negócio | `Biblioteca.UnitTests` | ✔ |
+| Integração com PostgreSQL real/containerizado | `Biblioteca.IntegrationTests` (Testcontainers) | ✔ |
 | Concorrente para o último exemplar | `LastCopyConcurrencyTests` | ✅ |
 | Idempotência | `IdempotencyTests` | ✅ |
 | Preservação de histórico após devolução/cancelamento | `LoanHistoryTests` | ✅ |

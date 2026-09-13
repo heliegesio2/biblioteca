@@ -22,7 +22,7 @@ appsettings.*.local.json
 !.env.example
 
 # Ferramentas locais
-.claude/settings.local.json
+.claude/
 
 # Ajustes de Compose específicos desta máquina (ex.: porta ocupada por outro serviço)
 docker-compose.override.yml

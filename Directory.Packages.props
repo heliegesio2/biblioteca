@@ -13,6 +13,15 @@
     <!-- src/Biblioteca.Api — fase 0 -->
     <PackageVersion Include="Microsoft.AspNetCore.OpenApi" Version="10.0.11" />
 
+    <!-- src/Biblioteca.Api — fase 1 (persistência). EFCore.* fixado na mesma versão do
+         Design para toda a árvore de dependências (CentralPackageTransitivePinning) —
+         Npgsql.EntityFrameworkCore.PostgreSQL 10.0.3 aceita qualquer 10.x >= 10.0.4. -->
+    <PackageVersion Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.3" />
+    <PackageVersion Include="Microsoft.EntityFrameworkCore" Version="10.0.12" />
+    <PackageVersion Include="Microsoft.EntityFrameworkCore.Relational" Version="10.0.12" />
+    <PackageVersion Include="Microsoft.EntityFrameworkCore.Abstractions" Version="10.0.12" />
+    <PackageVersion Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.12" />
+
     <!-- tests/* — fase 0 -->
     <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
     <PackageVersion Include="xunit" Version="2.9.3" />

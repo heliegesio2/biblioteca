@@ -1,0 +1,36 @@
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+
+[*.cs]
+indent_size = 4
+
+# file-scoped namespaces em todo o código novo
+csharp_style_namespace_declarations = file_scoped:error
+
+# sealed por padrão — regra de convenção do CLAUDE.md, não um analyzer built-in;
+# aplicada em revisão e no `code-review`, não pelo compilador.
+
+csharp_new_line_before_open_brace = all
+csharp_prefer_braces = true:suggestion
+dotnet_sort_system_directives_first = true
+
+# nomes de parâmetros/campos privados
+dotnet_naming_rule.private_members_underscore.symbols = private_fields
+dotnet_naming_rule.private_members_underscore.style = underscore_prefix
+dotnet_naming_rule.private_members_underscore.severity = suggestion
+dotnet_naming_symbols.private_fields.applicable_kinds = field
+dotnet_naming_symbols.private_fields.applicable_accessibilities = private
+dotnet_naming_style.underscore_prefix.required_prefix = _
+dotnet_naming_style.underscore_prefix.capitalization = camelCase
+
+[*.{json,yml,yaml}]
+indent_size = 2
+
+[*.md]
+trim_trailing_whitespace = false

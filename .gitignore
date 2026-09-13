@@ -1,0 +1,33 @@
+# Build outputs
+bin/
+obj/
+out/
+
+# Visual Studio / Rider / VS Code
+.vs/
+.vscode/
+.idea/
+*.user
+*.suo
+
+# Testes
+[Tt]est[Rr]esult*/
+coverage*/
+*.trx
+
+# Segredos e configuração local (nunca versionar segredo real — CLAUDE.md regra 7)
+appsettings.*.local.json
+*.env
+.env.*
+!.env.example
+
+# Ferramentas locais
+.claude/settings.local.json
+
+# SO
+Thumbs.db
+.DS_Store
+
+# Helm
+deploy/helm/**/charts/
+deploy/helm/**/*.tgz

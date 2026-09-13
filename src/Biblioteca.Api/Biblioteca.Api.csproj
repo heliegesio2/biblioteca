@@ -7,6 +7,17 @@
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
+    <PackageReference Include="Npgsql" />
+    <PackageReference Include="Scrutor" />
+    <PackageReference Include="FluentValidation" />
+    <PackageReference Include="FluentValidation.DependencyInjectionExtensions" />
+  </ItemGroup>
+
+  <!-- Testes precisam construir decorators/Dispatcher (internal) isoladamente, sem
+       passar pela decoração completa do Scrutor. -->
+  <ItemGroup>
+    <InternalsVisibleTo Include="Biblioteca.UnitTests" />
+    <InternalsVisibleTo Include="Biblioteca.IntegrationTests" />
   </ItemGroup>
 
 </Project>

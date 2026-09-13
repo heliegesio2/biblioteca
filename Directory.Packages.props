@@ -22,11 +22,22 @@
     <PackageVersion Include="Microsoft.EntityFrameworkCore.Abstractions" Version="10.0.12" />
     <PackageVersion Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.12" />
 
+    <!-- src/Biblioteca.Api — fase 2 (infraestrutura CQRS) -->
+    <PackageVersion Include="Scrutor" Version="7.0.0" />
+    <PackageVersion Include="FluentValidation" Version="12.1.1" />
+    <PackageVersion Include="FluentValidation.DependencyInjectionExtensions" Version="12.1.1" />
+    <PackageVersion Include="Npgsql" Version="10.0.3" />
+
     <!-- tests/* — fase 0 -->
     <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
     <PackageVersion Include="xunit" Version="2.9.3" />
     <PackageVersion Include="xunit.runner.visualstudio" Version="3.1.4" />
     <PackageVersion Include="coverlet.collector" Version="6.0.4" />
+
+    <!-- tests/Biblioteca.IntegrationTests — fase 2 (Testcontainers + WebApplicationFactory) -->
+    <PackageVersion Include="Testcontainers.PostgreSql" Version="4.15.0" />
+    <PackageVersion Include="Microsoft.AspNetCore.Mvc.Testing" Version="10.0.12" />
+    <PackageVersion Include="Respawn" Version="7.0.0" />
   </ItemGroup>
 
 </Project>

@@ -11,6 +11,8 @@
     <PackageReference Include="Scrutor" />
     <PackageReference Include="FluentValidation" />
     <PackageReference Include="FluentValidation.DependencyInjectionExtensions" />
+    <PackageReference Include="Microsoft.Extensions.Caching.Hybrid" />
+    <PackageReference Include="Microsoft.Extensions.Caching.StackExchangeRedis" />
   </ItemGroup>
 
   <!-- Testes precisam construir decorators/Dispatcher (internal) isoladamente, sem

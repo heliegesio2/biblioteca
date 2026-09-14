@@ -12,14 +12,15 @@ using Microsoft.Extensions.DependencyInjection;
 using Npgsql;
 using Respawn;
 using Testcontainers.PostgreSql;
+using Testcontainers.Redis;
 
 namespace Biblioteca.IntegrationTests.Infrastructure;
 
 /// <summary>
-/// Um PostgreSQL real via Testcontainers (ADR-0006 — sem EF InMemory) compartilhado por
-/// toda a <see cref="PostgresCollection"/>. Aplica as migrations reais na subida e expõe
-/// <see cref="ResetAsync"/> (Respawn) para isolar os testes entre si sem recriar o
-/// container a cada um.
+/// PostgreSQL e Redis reais via Testcontainers (ADR-0006 — sem EF InMemory),
+/// compartilhados por toda a <see cref="PostgresCollection"/>. Aplica as migrations reais
+/// na subida e expõe <see cref="ResetAsync"/> (Respawn) para isolar os testes entre si sem
+/// recriar os containers a cada um.
 ///
 /// Também injeta, só para teste, uma rota que expõe <c>PingCommand</c>
 /// (Infrastructure/Cqrs/SelfTest) via HTTP — prova que Problem Details/correlationId
@@ -33,11 +34,13 @@ public sealed class PostgresApiFactory : WebApplicationFactory<Program>, IAsyncL
         .WithPassword("postgres")
         .Build();
 
+    private readonly RedisContainer _redis = new RedisBuilder("redis:7-alpine").Build();
+
     private Respawner? _respawner;
 
     async Task IAsyncLifetime.InitializeAsync()
     {
-        await _container.StartAsync();
+        await Task.WhenAll(_container.StartAsync(), _redis.StartAsync());
 
         using var scope = Services.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<BibliotecaDbContext>();
@@ -52,6 +55,13 @@ public sealed class PostgresApiFactory : WebApplicationFactory<Program>, IAsyncL
             SchemasToInclude = ["public"],
         });
     }
+
+    /// <summary>Simula Redis fora do ar (docs/caching.md#redis-fora-do-ar) — parar/religar
+    /// o mesmo container preserva o mapeamento de porta, então a connection string
+    /// configurada no host continua válida depois de <see cref="StartRedisAsync"/>.</summary>
+    public Task StopRedisAsync() => _redis.StopAsync();
+
+    public Task StartRedisAsync() => _redis.StartAsync();
 
     public async Task ResetAsync()
     {
@@ -73,6 +83,7 @@ public sealed class PostgresApiFactory : WebApplicationFactory<Program>, IAsyncL
             configBuilder.AddInMemoryCollection(new Dictionary<string, string?>
             {
                 ["ConnectionStrings:Postgres"] = _container.GetConnectionString(),
+                ["ConnectionStrings:Redis"] = _redis.GetConnectionString(),
             }));
 
         builder.ConfigureServices(services =>
@@ -81,7 +92,7 @@ public sealed class PostgresApiFactory : WebApplicationFactory<Program>, IAsyncL
 
     async Task IAsyncLifetime.DisposeAsync()
     {
-        await _container.DisposeAsync();
+        await Task.WhenAll(_container.DisposeAsync().AsTask(), _redis.DisposeAsync().AsTask());
         await base.DisposeAsync();
     }
 

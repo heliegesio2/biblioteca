@@ -18,33 +18,33 @@ Legenda: ✅ documentado e planejado · 🔨 em implementação · ✔ concluíd
 
 | Requisito | Implementação | Teste | Status |
 |---|---|---|---|
-| Cadastrar usuário/leitor | `POST /users` | `UserTests` | ✅ |
-| Emprestar exemplar disponível | `POST /loans` → `UPDATE` condicional | `CreateLoanTests` | ✅ |
-| Registrar data do empréstimo e prevista de devolução | `borrowed_at`, `due_at` (`Loans:LoanPeriodDays`) | `LoanPolicyTests.DueDate_*` | ✅ |
-| Devolver empréstimo | `POST /loans/{id}/return` | `CreateLoanTests`, `LoanHistoryTests` | ✅ |
-| Cancelar preservando a informação de que existiu | `POST /loans/{id}/cancel` → status `Cancelled`, linha preservada | `LoanHistoryTests` | ✅ |
-| Consultar disponibilidade atual | `GET /books/{id}/availability` (cacheado) | `CacheTests` | ✅ |
-| Histórico por livro e por usuário | `GET /books/{id}/history`, `GET /users/{id}/loans` | `LoanHistoryTests` | ✅ |
+| Cadastrar usuário/leitor | `POST /users` | `UserTests` | ✔ |
+| Emprestar exemplar disponível | `POST /loans` → `UPDATE` condicional | `CreateLoanTests` | ✔ |
+| Registrar data do empréstimo e prevista de devolução | `borrowed_at`, `due_at` (`Loans:LoanPeriodDays`) | `LoanPolicyTests.ComputeDueAt_SomaOPrazoConfigurado`, `CreateLoanTests.CaminhoFeliz_Retorna201ComDueAtCorreto` | ✔ |
+| Devolver empréstimo | `POST /loans/{id}/return` | `LoanHistoryTests`, `IdempotencyTests` | ✔ |
+| Cancelar preservando a informação de que existiu | `POST /loans/{id}/cancel` → status `Cancelled`, linha preservada | `LoanHistoryTests` | ✔ |
+| Consultar disponibilidade atual | `GET /books/{id}/availability` (cache chega na fase 5) | `LoanHistoryTests` | ✔ |
+| Histórico por livro e por usuário | `GET /books/{id}/history`, `GET /users/{id}/loans` | `LoanHistoryTests` | ✔ |
 
 ## 3. Concorrência e consistência
 
 | Requisito | Implementação | Teste | Status |
 |---|---|---|---|
-| Exatamente um empréstimo bem-sucedido no último exemplar | `UPDATE … WHERE available_copies > 0` em `READ COMMITTED` | `LastCopyConcurrencyTests` | ✅ |
-| Rejeição **clara de regra de negócio** para a outra tentativa | `409 book-unavailable` em Problem Details | idem (asserção sobre o `code`) | ✅ |
-| Nenhuma quantidade negativa, empréstimo duplicado ou estado inconsistente | `CHECK` + índice único parcial + transação única | idem + `CreateLoanTests.DuplicateActiveLoan` | ✅ |
-| Cenário automatizado em teste de integração | `LastCopyConcurrencyTests` com 20 requisições paralelas | — | ✅ |
-| Estratégia e trade-offs documentados no README | [README §8.1](../README.md#81-concorrência--o-último-exemplar) + [concurrency.md](concurrency.md) | — | ✅ |
+| Exatamente um empréstimo bem-sucedido no último exemplar | `UPDATE … WHERE available_copies > 0` em `READ COMMITTED` | `LastCopyConcurrencyTests` | ✔ |
+| Rejeição **clara de regra de negócio** para a outra tentativa | `409 book-unavailable` em Problem Details | idem (asserção sobre o `code`) | ✔ |
+| Nenhuma quantidade negativa, empréstimo duplicado ou estado inconsistente | `CHECK` + índice único parcial + transação única | idem + `CreateLoanTests.EmprestimoDuplicadoDoMesmoLivro_Retorna409` | ✔ |
+| Cenário automatizado em teste de integração | `LastCopyConcurrencyTests` com 20 requisições paralelas | — | ✔ |
+| Estratégia e trade-offs documentados no README | [README §8.1](../README.md#81-concorrência--o-último-exemplar) + [concurrency.md](concurrency.md) | — | ✔ |
 | **Não** usar `rowversion` | `xmin` (nativo do PostgreSQL) na edição de catálogo; `rowversion` descartado explicitamente | `UpdateBookConcurrencyTests` | ✔ |
 
 ## 4. Idempotência
 
 | Requisito | Implementação | Teste | Status |
 |---|---|---|---|
-| `POST /loans` aceita `Idempotency-Key` | Obrigatório; ausente → `400` ([desvio documentado](api-contract.md#desvios-do-contrato-sugerido)) | `IdempotencyTests.MissingKey` | ✅ |
-| Repetir não cria dois empréstimos | `idempotency_keys` com PK, na mesma transação | `IdempotencyTests.SameKey_SameBody_Sequential` | ✅ |
-| Repetir não reduz disponibilidade duas vezes | idem — o handler não roda no replay | idem (asserção sobre `availableCopies`) | ✅ |
-| Devolver a resposta anterior ou equivalente | Snapshot de status + corpo, com `Idempotency-Replayed: true` | `IdempotencyTests.SameKey_Concurrent_TenRequests` | ✅ |
+| `POST /loans` aceita `Idempotency-Key` | Obrigatório; ausente → `400` ([desvio documentado](api-contract.md#desvios-do-contrato-sugerido)) | `IdempotencyTests.MissingKey_Retorna400` | ✔ |
+| Repetir não cria dois empréstimos | `idempotency_keys` com PK, na mesma transação | `IdempotencyTests.SameKey_SameBody_Sequential`, `SameKey_Concurrent_TenRequests` | ✔ |
+| Repetir não reduz disponibilidade duas vezes | idem — o handler não roda no replay | idem (asserção sobre `availableCopies`) | ✔ |
+| Devolver a resposta anterior ou equivalente | Snapshot de status + corpo, com `Idempotency-Replayed: true` | `IdempotencyTests.SameKey_SameBody_Sequential` | ✔ |
 
 ## 5. Auditoria de domínio
 
@@ -104,10 +104,11 @@ Legenda: ✅ documentado e planejado · 🔨 em implementação · ✔ concluíd
 
 | Endpoint sugerido | Situação |
 |---|---|
-| `POST /books`, `GET /books`, `GET /books/{id}`, `PATCH /books/{id}`, `DELETE /books/{id}` | ✅ (`PATCH` exige `If-Match`; `DELETE` desativa — [desvios](api-contract.md#desvios-do-contrato-sugerido)) |
-| `POST /users`, `GET /users/{id}/loans` | ✅ |
-| `POST /loans` (com `Idempotency-Key`), `POST /loans/{id}/return`, `POST /loans/{id}/cancel` | ✅ |
-| `GET /books/{id}/availability`, `GET /books/{id}/history`, `GET /audit-events` | ✅ |
+| `POST /books`, `GET /books`, `GET /books/{id}`, `PATCH /books/{id}`, `DELETE /books/{id}` | ✔ (`PATCH` exige `If-Match`; `DELETE` desativa — [desvios](api-contract.md#desvios-do-contrato-sugerido)) |
+| `POST /users`, `GET /users/{id}/loans` | ✔ |
+| `POST /loans` (com `Idempotency-Key`), `POST /loans/{id}/return`, `POST /loans/{id}/cancel` | ✔ |
+| `GET /books/{id}/availability`, `GET /books/{id}/history` | ✔ |
+| `GET /audit-events` | ✅ (fase 6) |
 | `GET /health/live`, `GET /health/ready` | ✅ |
 | **Acréscimo**: `POST /auth/token` | ✅ — necessário para o `actor` da auditoria ([security.md](security.md)) |
 
@@ -117,9 +118,9 @@ Legenda: ✅ documentado e planejado · 🔨 em implementação · ✔ concluíd
 |---|---|---|
 | Unitários das regras de negócio | `Biblioteca.UnitTests` | ✔ |
 | Integração com PostgreSQL real/containerizado | `Biblioteca.IntegrationTests` (Testcontainers) | ✔ |
-| Concorrente para o último exemplar | `LastCopyConcurrencyTests` | ✅ |
-| Idempotência | `IdempotencyTests` | ✅ |
-| Preservação de histórico após devolução/cancelamento | `LoanHistoryTests` | ✅ |
+| Concorrente para o último exemplar | `LastCopyConcurrencyTests` | ✔ |
+| Idempotência | `IdempotencyTests` | ✔ |
+| Preservação de histórico após devolução/cancelamento | `LoanHistoryTests` | ✔ |
 
 ## 12. README esperado
 

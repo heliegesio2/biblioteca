@@ -8,8 +8,8 @@ namespace Biblioteca.Api.Features.Catalog;
 
 /// <summary>
 /// Só tradução HTTP → comando/consulta → HTTP (docs/architecture.md#como-um-endpoint-fica).
-/// Papéis (`librarian`) chegam na fase 7 — sem autorização por enquanto, qualquer chamada
-/// passa.
+/// Escrita exige o papel `librarian` (docs/security.md#autorização); leitura só exige
+/// autenticação — coberta pela fallback policy padrão, sem atributo explícito.
 /// </summary>
 public static class CatalogEndpoints
 {
@@ -22,7 +22,7 @@ public static class CatalogEndpoints
             var command = new CreateBookCommand(request.Isbn, request.Title, request.Author, request.TotalCopies);
             var result = await dispatcher.Send(command, ct);
             return result.ToHttpResult(book => Results.Created($"/books/{book.Id}", book));
-        }).WithName("CreateBook");
+        }).RequireAuthorization("Librarian").WithName("CreateBook");
 
         group.MapGet("/", async (
                 IDispatcher dispatcher, CancellationToken ct,
@@ -71,13 +71,13 @@ public static class CatalogEndpoints
 
             httpContext.Response.Headers["ETag"] = result.Value.ETag;
             return Results.Ok(result.Value.Book);
-        }).WithName("UpdateBook");
+        }).RequireAuthorization("Librarian").WithName("UpdateBook");
 
         group.MapDelete("/{id:guid}", async (Guid id, IDispatcher dispatcher, CancellationToken ct) =>
         {
             var result = await dispatcher.Send(new DeactivateBookCommand(id), ct);
             return result.ToHttpResult(Results.NoContent);
-        }).WithName("DeactivateBook");
+        }).RequireAuthorization("Librarian").WithName("DeactivateBook");
 
         group.MapGet("/{id:guid}/availability", async (Guid id, IDispatcher dispatcher, CancellationToken ct) =>
         {

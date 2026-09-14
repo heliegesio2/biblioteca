@@ -4,7 +4,7 @@ using Biblioteca.Api.Infrastructure.Http;
 
 namespace Biblioteca.Api.Features.Audit;
 
-/// <summary>Papel (`librarian`) chega na fase 7 — sem autorização por enquanto.</summary>
+/// <summary>Exige o papel `librarian` (docs/security.md#autorização).</summary>
 public static class AuditEndpoints
 {
     public static IEndpointRouteBuilder MapAuditEndpoints(this IEndpointRouteBuilder app)
@@ -19,6 +19,7 @@ public static class AuditEndpoints
                 return result.ToHttpResult(Results.Ok);
             })
             .WithTags("Audit")
+            .RequireAuthorization("Librarian")
             .WithName("SearchAuditEvents");
 
         return app;

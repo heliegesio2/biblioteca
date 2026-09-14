@@ -50,13 +50,14 @@ Legenda: ✅ documentado e planejado · 🔨 em implementação · ✔ concluíd
 
 | Requisito | Implementação | Teste | Status |
 |---|---|---|---|
-| Criação e alteração de livro | `BookCreated`, `BookUpdated` (com `from`/`to`) | `AuditTests` | ✅ |
-| Desativação de livro | `BookDeactivated` | `AuditTests` | ✅ |
-| Criação de empréstimo | `LoanCreated` | `AuditTests`, `LastCopyConcurrencyTests` | ✅ |
-| Devolução de empréstimo | `LoanReturned` | `LoanHistoryTests` | ✅ |
-| Cancelamento de empréstimo | `LoanCancelled` (com `reason`) | `LoanHistoryTests` | ✅ |
-| Entidade, id, ação, ator, timestamp UTC, correlação e informação suficiente | Esquema de `audit_events` ([auditing.md](auditing.md#esquema-do-evento)) | `AuditTests` | ✅ |
-| Trilha de negócio ≠ log técnico | Tabela no PostgreSQL, gravada **na transação** | `AuditTests` (evento existe ⟺ mudança existe) | ✅ |
+| Criação e alteração de livro | `BookCreated`, `BookUpdated` (com `from`/`to`) | `AuditTests` | ✔ |
+| Desativação de livro | `BookDeactivated` | `AuditTests` | ✔ |
+| Criação de empréstimo | `LoanCreated` | `AuditTests`, `LastCopyConcurrencyTests` | ✔ |
+| Devolução de empréstimo | `LoanReturned` | `AuditTests`, `LoanHistoryTests` | ✔ |
+| Cancelamento de empréstimo | `LoanCancelled` (com `reason`) | `LoanHistoryTests` | ✔ |
+| Entidade, id, ação, ator, timestamp UTC, correlação e informação suficiente | Esquema de `audit_events` ([auditing.md](auditing.md#esquema-do-evento)) | `AuditTests` | ✔ |
+| Trilha de negócio ≠ log técnico | Tabela no PostgreSQL, gravada **na transação** | `AuditTests` (evento existe ⟺ mudança existe) | ✔ |
+| Consulta com filtros e paginação | `GET /audit-events` | `AuditTests` | ✔ |
 
 ## 6. Cache
 
@@ -109,7 +110,7 @@ Legenda: ✅ documentado e planejado · 🔨 em implementação · ✔ concluíd
 | `POST /users`, `GET /users/{id}/loans` | ✔ |
 | `POST /loans` (com `Idempotency-Key`), `POST /loans/{id}/return`, `POST /loans/{id}/cancel` | ✔ |
 | `GET /books/{id}/availability`, `GET /books/{id}/history` | ✔ |
-| `GET /audit-events` | ✅ (fase 6) |
+| `GET /audit-events` | ✔ |
 | `GET /health/live`, `GET /health/ready` | ✅ |
 | **Acréscimo**: `POST /auth/token` | ✅ — necessário para o `actor` da auditoria ([security.md](security.md)) |
 

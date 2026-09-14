@@ -19,6 +19,20 @@ public static class ProblemDetailsSetup
                     Activity.Current?.Id ?? context.HttpContext.TraceIdentifier;
                 context.ProblemDetails.Extensions["correlationId"] =
                     context.HttpContext.GetCorrelationId();
+
+                // 401/403 gerados pelo middleware de autenticação/autorização (fallback
+                // policy, papel exigido) não passam por ResultExtensions — sem isto,
+                // ficariam sem "code", quebrando o contrato de que todo erro tem um
+                // (docs/api-contract.md#códigos-de-erro-de-negócio).
+                if (!context.ProblemDetails.Extensions.ContainsKey("code"))
+                {
+                    context.ProblemDetails.Extensions["code"] = context.ProblemDetails.Status switch
+                    {
+                        StatusCodes.Status401Unauthorized => "unauthenticated",
+                        StatusCodes.Status403Forbidden => "forbidden",
+                        _ => "error",
+                    };
+                }
             };
         });
 }

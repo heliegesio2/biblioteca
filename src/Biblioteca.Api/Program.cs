@@ -1,8 +1,11 @@
+using System.Text;
 using Biblioteca.Api.Features.Audit;
+using Biblioteca.Api.Features.Auth;
 using Biblioteca.Api.Features.Catalog;
 using Biblioteca.Api.Features.Loans;
 using Biblioteca.Api.Features.Loans.Domain;
 using Biblioteca.Api.Features.Users;
+using Biblioteca.Api.Infrastructure.Auth;
 using Biblioteca.Api.Infrastructure.Caching;
 using Biblioteca.Api.Infrastructure.Cqrs;
 using Biblioteca.Api.Infrastructure.Http;
@@ -10,8 +13,11 @@ using Biblioteca.Api.Infrastructure.Idempotency;
 using Biblioteca.Api.Infrastructure.Observability;
 using Biblioteca.Api.Infrastructure.Persistence;
 using FluentValidation;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Hybrid;
+using Microsoft.IdentityModel.Tokens;
 
 var builder = WebApplication.CreateBuilder(args);
 var apiAssembly = typeof(Program).Assembly;
@@ -75,6 +81,67 @@ builder.Services.AddHybridCache(options =>
     };
 });
 
+// Segurança (fase 7): JWT Bearer com papéis (docs/security.md). POST /auth/token é o
+// substituto declarado de um identity provider — só emite; nada no domínio depende de
+// como o token chegou, só do ClaimsPrincipal resultante.
+const string DevelopmentSigningKey = "dev-only-signing-key-biblioteca-nao-versionar-em-producao-jamais";
+
+builder.Services.Configure<AuthOptions>(builder.Configuration.GetSection("Auth"));
+
+var authIssuer = builder.Configuration["Auth:Issuer"] ?? "biblioteca";
+var authAudience = builder.Configuration["Auth:Audience"] ?? "biblioteca";
+var authSigningKey = builder.Configuration["Auth:SigningKey"];
+
+if (builder.Environment.IsProduction())
+{
+    // Falhar no start é melhor do que servir tráfego com token forjável.
+    if (string.IsNullOrEmpty(authSigningKey) ||
+        Encoding.UTF8.GetByteCount(authSigningKey) < 32 ||
+        authSigningKey == DevelopmentSigningKey)
+    {
+        throw new InvalidOperationException(
+            "Auth:SigningKey ausente, curta demais (< 32 bytes) ou igual à chave de " +
+            "desenvolvimento. A aplicação recusa subir em Production com um token forjável.");
+    }
+}
+else if (string.IsNullOrEmpty(authSigningKey))
+{
+    authSigningKey = DevelopmentSigningKey;
+}
+
+builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer(options =>
+    {
+        // Mantém "sub"/"email"/"role" como estão no token, sem remapear para as URIs
+        // longas que o JwtSecurityTokenHandler usa por padrão.
+        options.MapInboundClaims = false;
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuer = true,
+            ValidIssuer = authIssuer,
+            ValidateAudience = true,
+            ValidAudience = authAudience,
+            ValidateLifetime = true,
+            ValidateIssuerSigningKey = true,
+            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(authSigningKey)),
+            RoleClaimType = "role",
+            NameClaimType = "sub",
+            ClockSkew = TimeSpan.Zero,
+        };
+    });
+
+builder.Services.AddAuthorization(options =>
+{
+    // Fallback seguro por padrão: todo endpoint sem AllowAnonymous() explícito exige
+    // usuário autenticado, mesmo que ninguém tenha lembrado de marcar isso nele.
+    options.FallbackPolicy = new AuthorizationPolicyBuilder().RequireAuthenticatedUser().Build();
+    options.AddPolicy("Librarian", policy => policy.RequireRole("librarian"));
+    options.AddPolicy("SameUserOrLibrarian", policy => policy.Requirements.Add(new SameUserOrLibrarianRequirement()));
+});
+builder.Services.AddSingleton<IAuthorizationHandler, SameUserOrLibrarianHandler>();
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddScoped<ICurrentActor, CurrentActor>();
+
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
@@ -85,12 +152,27 @@ if (app.Environment.IsDevelopment())
 
 app.UseMiddleware<CorrelationIdMiddleware>();
 app.UseExceptionHandler();
+// Sem isto, um 401/403 que o middleware de autenticação/autorização só define via
+// StatusCode (sem corpo) nunca passaria pelo IProblemDetailsService — o cliente veria
+// status certo, corpo vazio, quebrando o contrato "todo erro é Problem Details"
+// (docs/api-contract.md#erros--rfc-9457-problem-details).
+app.UseStatusCodePages();
 app.UseHttpsRedirection();
+
+app.UseAuthentication();
+app.UseAuthorization();
 
 app.MapCatalogEndpoints();
 app.MapUserEndpoints();
 app.MapLoanEndpoints();
 app.MapAuditEndpoints();
+
+// POST /auth/token não existe em Production — não há identity provider de mentira em
+// tráfego real (docs/security.md#post-authtoken).
+if (!app.Environment.IsProduction())
+{
+    app.MapAuthEndpoints();
+}
 
 app.Run();
 

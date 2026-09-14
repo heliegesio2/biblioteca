@@ -51,4 +51,12 @@ public sealed record Error(string Code, string Title, string Detail, int HttpSta
     /// <summary>Outra requisição com a mesma chave ainda está em processamento.</summary>
     public static Error IdempotencyInProgress() => new("idempotency-in-progress", "Requisição em andamento",
         "Uma requisição com esta chave de idempotência já está em processamento.", StatusCodes.Status409Conflict);
+
+    /// <summary>
+    /// Acesso a recurso de terceiro (docs/security.md#autorização) — nunca 404: o recurso
+    /// existe, e mascarar isso não protege nada num sistema em que os identificadores já
+    /// são conhecidos de quem os criou.
+    /// </summary>
+    public static Error Forbidden() => new("forbidden", "Acesso negado",
+        "Você não tem permissão para acessar ou modificar este recurso.", StatusCodes.Status403Forbidden);
 }

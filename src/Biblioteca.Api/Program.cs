@@ -1,7 +1,11 @@
 using Biblioteca.Api.Features.Audit;
 using Biblioteca.Api.Features.Catalog;
+using Biblioteca.Api.Features.Loans;
+using Biblioteca.Api.Features.Loans.Domain;
+using Biblioteca.Api.Features.Users;
 using Biblioteca.Api.Infrastructure.Cqrs;
 using Biblioteca.Api.Infrastructure.Http;
+using Biblioteca.Api.Infrastructure.Idempotency;
 using Biblioteca.Api.Infrastructure.Observability;
 using Biblioteca.Api.Infrastructure.Persistence;
 using FluentValidation;
@@ -27,6 +31,17 @@ builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddScoped<ICorrelationIdAccessor, CorrelationIdAccessor>();
 builder.Services.AddScoped<IAuditWriter, AuditWriter>();
 
+// Empréstimos (fase 4) — parâmetros de negócio vêm de configuração, nunca hard-coded.
+builder.Services.AddSingleton(new LoanPolicy(
+    builder.Configuration.GetValue("Loans:LoanPeriodDays", 14),
+    builder.Configuration.GetValue("Loans:MaxActiveLoansPerUser", 5)));
+
+// Idempotência de POST /loans (ADR-0005): chave e efeito na mesma transação.
+builder.Services.Configure<IdempotencyOptions>(builder.Configuration.GetSection("Idempotency"));
+builder.Services.AddScoped<IdempotencyStore>();
+builder.Services.AddScoped<IIdempotencyReplayAccessor, IdempotencyReplayAccessor>();
+builder.Services.AddHostedService<IdempotencyCleanupService>();
+
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
@@ -40,6 +55,8 @@ app.UseExceptionHandler();
 app.UseHttpsRedirection();
 
 app.MapCatalogEndpoints();
+app.MapUserEndpoints();
+app.MapLoanEndpoints();
 
 app.Run();
 

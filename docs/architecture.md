@@ -129,6 +129,12 @@ Regras de dependência (verificadas por um teste de arquitetura):
     `BibliotecaDbContext` (sem chamar handler ou domínio de `Loans`) — é a mesma
     natureza da consulta que já atravessa tabelas livremente, não um acoplamento de
     regra de negócio entre os dois slices.
+  - `Users` lê `Loans` (todos os status) em `GetUserLoans` — mesma natureza de
+    projeção do item anterior.
+  - `Loans` usa `Catalog.BookCache` (nomes de chave, não lógica) para enfileirar a
+    invalidação do livro afetado em `CreateLoan`/`ReturnLoan`/`CancelLoan` — é o
+    mesmo par chave/livro que `Catalog` já invalida em `UpdateBook`/`DeactivateBook`;
+    duplicar a convenção de nome em vez de compartilhá-la é que criaria divergência.
 - `Features/*/Domain/*` não referencia `Microsoft.EntityFrameworkCore`, `HttpContext`
   nem `HybridCache`.
 - Um handler nunca chama outro handler. Lógica comum vai para o domínio.

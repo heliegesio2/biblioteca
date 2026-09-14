@@ -2,7 +2,7 @@
 bin/
 obj/
 out/
-
+CLAUDE.md
 # Visual Studio / Rider / VS Code
 .vs/
 .vscode/

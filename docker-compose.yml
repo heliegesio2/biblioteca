@@ -25,8 +25,37 @@ services:
       timeout: 5s
       retries: 10
 
-  # Os serviços `migrator` e `api` entram na fase 5 do plano de implementação
-  # (docs/implementation-plan.md), quando houver migration e API para subir.
+  # docs/operations.md#migrations: passo separado que termina antes da API subir —
+  # reproduz o mesmo modelo do Job do Helm em produção.
+  migrator:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    entrypoint: ["/app/efbundle"]
+    command: ["--connection", "Host=postgres;Port=5432;Database=biblioteca;Username=postgres;Password=postgres"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8080:8080"
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ASPNETCORE_URLS: http://+:8080
+      ConnectionStrings__Postgres: "Host=postgres;Port=5432;Database=biblioteca;Username=postgres;Password=postgres"
+      ConnectionStrings__Redis: "redis:6379"
+    depends_on:
+      migrator:
+        condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
 
 volumes:
   biblioteca-postgres-data:

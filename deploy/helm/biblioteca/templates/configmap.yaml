@@ -1,0 +1,17 @@
+# Configuração não-sensível (docs/operations.md#configuração). Credenciais e a chave de
+# assinatura JWT vêm do Secret referenciado em secret-ref.yaml, nunca daqui.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "biblioteca.fullname" . }}-config
+  labels:
+    {{- include "biblioteca.labels" . | nindent 4 }}
+data:
+  ASPNETCORE_ENVIRONMENT: {{ .Values.config.aspnetcoreEnvironment | quote }}
+  ASPNETCORE_URLS: "http://+:8080"
+  OTEL_EXPORTER_OTLP_ENDPOINT: {{ .Values.config.otlpEndpoint | quote }}
+  Loans__LoanPeriodDays: {{ .Values.config.loans.loanPeriodDays | quote }}
+  Loans__MaxActiveLoansPerUser: {{ .Values.config.loans.maxActiveLoansPerUser | quote }}
+  Cache__BookTtlSeconds: {{ .Values.config.cache.bookTtlSeconds | quote }}
+  Auth__Issuer: {{ .Values.config.auth.issuer | quote }}
+  Auth__Audience: {{ .Values.config.auth.audience | quote }}

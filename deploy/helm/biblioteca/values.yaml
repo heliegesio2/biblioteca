@@ -1,0 +1,58 @@
+image:
+  repository: biblioteca-api
+  tag: latest
+  pullPolicy: IfNotPresent
+
+replicaCount: 2
+
+serviceAccount:
+  create: true
+  name: ""
+
+service:
+  type: ClusterIP
+  port: 8080
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi
+
+# docs/operations.md#de-2-a-11-réplicas: o limite real de escala é conexão de banco, não
+# CPU — 11 réplicas × maxPoolSize precisa ficar sob o max_connections do Postgres.
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 11
+  targetCPUUtilizationPercentage: 70
+
+podDisruptionBudget:
+  minAvailable: 1
+
+terminationGracePeriodSeconds: 30
+
+# Nenhum valor real aqui (CLAUDE.md regra 7) — o Secret precisa existir no cluster antes
+# do `helm install`/`upgrade`, com as chaves listadas em secretKeys.
+existingSecret: biblioteca-secrets
+secretKeys:
+  postgresConnectionString: postgres-connection-string
+  redisConnectionString: redis-connection-string
+  authSigningKey: auth-signing-key
+
+migrationJob:
+  backoffLimit: 2
+
+config:
+  aspnetcoreEnvironment: Production
+  otlpEndpoint: ""
+  loans:
+    loanPeriodDays: 14
+    maxActiveLoansPerUser: 5
+  cache:
+    bookTtlSeconds: 300
+  auth:
+    issuer: biblioteca
+    audience: biblioteca

@@ -8,5 +8,6 @@
 .github/
 docs/
 deploy/
+tests/
 *.md
 levantamento.pdf

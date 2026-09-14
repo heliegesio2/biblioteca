@@ -49,7 +49,22 @@ builder.Services.AddHostedService<IdempotencyCleanupService>();
 // (GetAvailability) sobrescrevem o default abaixo, que vale para o livro (GetBookById).
 builder.Services.Configure<CacheOptions>(builder.Configuration.GetSection("Cache"));
 builder.Services.AddStackExchangeRedisCache(options =>
-    options.Configuration = builder.Configuration.GetConnectionString("Redis"));
+{
+    // Timeouts curtos de propósito: "degrada, não derruba" só é verdade se a
+    // degradação for rápida. Sem isso, um Redis lento/instável (não só "fora do ar")
+    // deixaria toda leitura cacheada esperando o timeout padrão do cliente (vários
+    // segundos) antes de cair para o banco — trocando o problema de disponibilidade
+    // por um de latência, exatamente o que docs/caching.md#redis-fora-do-ar quer evitar.
+    options.ConfigurationOptions = new StackExchange.Redis.ConfigurationOptions
+    {
+        EndPoints = { builder.Configuration.GetConnectionString("Redis")! },
+        ConnectTimeout = 1000,
+        SyncTimeout = 1000,
+        AsyncTimeout = 1000,
+        ConnectRetry = 1,
+        AbortOnConnectFail = false,
+    };
+});
 builder.Services.AddHybridCache(options =>
 {
     var bookTtlSeconds = builder.Configuration.GetValue("Cache:BookTtlSeconds", 300);

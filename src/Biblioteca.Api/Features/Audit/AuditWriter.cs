@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Biblioteca.Api.Features.Audit.Domain;
+using Biblioteca.Api.Infrastructure.Http;
 using Biblioteca.Api.Infrastructure.Observability;
 using Biblioteca.Api.Infrastructure.Persistence;
 
@@ -18,19 +19,17 @@ public interface IAuditWriter
 internal sealed class AuditWriter(
     BibliotecaDbContext dbContext,
     ICorrelationIdAccessor correlationIdAccessor,
+    ICurrentActor currentActor,
     TimeProvider timeProvider)
     : IAuditWriter
 {
-    // Substituído por CurrentActor (JWT -> ator) na fase 7.
-    private const string SystemActor = "system";
-
     public void Record(string entityType, Guid entityId, string action, object payload)
     {
         var auditEvent = AuditEvent.Create(
             entityType,
             entityId,
             action,
-            SystemActor,
+            currentActor.Value,
             timeProvider.GetUtcNow(),
             correlationIdAccessor.CorrelationId,
             JsonSerializer.Serialize(payload));

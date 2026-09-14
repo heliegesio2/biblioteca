@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using Biblioteca.Api.Infrastructure.Observability;
 
 namespace Biblioteca.Api.Infrastructure.Cqrs;
 
@@ -22,14 +23,15 @@ internal sealed class Dispatcher(IServiceProvider serviceProvider) : IDispatcher
     private static readonly ConcurrentDictionary<Type, object> CommandWrappers = new();
     private static readonly ConcurrentDictionary<Type, object> QueryWrappers = new();
 
-    public Task<Result<TResult>> Send<TResult>(ICommand<TResult> command, CancellationToken cancellationToken)
+    public async Task<Result<TResult>> Send<TResult>(ICommand<TResult> command, CancellationToken cancellationToken)
     {
         var wrapper = (ICommandWrapper<TResult>)CommandWrappers.GetOrAdd(
             command.GetType(),
             commandType => Activator.CreateInstance(
                 typeof(CommandWrapper<,>).MakeGenericType(commandType, typeof(TResult)))!);
 
-        return wrapper.Handle(command, serviceProvider, cancellationToken);
+        using var activity = BibliotecaActivitySource.Instance.StartActivity(command.GetType().Name);
+        return await wrapper.Handle(command, serviceProvider, cancellationToken);
     }
 
     public Task<Result<TResult>> Send<TResult>(IQuery<TResult> query, CancellationToken cancellationToken)

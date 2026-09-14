@@ -93,14 +93,18 @@ Legenda: ✅ documentado e planejado · 🔨 em implementação · ✔ concluíd
 
 | Requisito | Implementação | Teste | Status |
 |---|---|---|---|
-| `GET /health/live` que não falha por Postgres/Redis indisponível | Check sem dependência externa | `HealthTests.Live_Healthy_WithPostgresDown` | ✅ |
-| `GET /health/ready` com as dependências para servir tráfego | Postgres crítico; Redis reportado como degradado | `HealthTests` | ✅ |
-| Logs estruturados com `correlationId` e ids de negócio | JSON em stdout, escopo do middleware | `ProblemDetailsTests`, inspeção de log | ✅ |
-| Métrica de empréstimos criados | `biblioteca.loans.created` | `MetricsTests` | ✅ |
-| Métrica de rejeições por indisponibilidade | `biblioteca.loans.rejected{reason=unavailable}` | `MetricsTests` | ✅ |
-| Métrica de operações idempotentes repetidas | `biblioteca.idempotency.replayed` | `MetricsTests` | ✅ |
-| Métrica de latência do endpoint de empréstimo | `biblioteca.loans.create.duration{outcome}` | `MetricsTests` | ✅ |
-| Traces e métricas compatíveis com OpenTelemetry | OTLP + instrumentação de ASP.NET Core, Npgsql e Redis | — | ✅ |
+| `GET /health/live` que não consulta nada externo | `Predicate = _ => false`, nenhum check executado | `HealthTests.Live_NaoConsultaNadaExterno_RespondeHealthy` | ✔ |
+| `GET /health/ready` com Postgres crítico e Redis degradado (nunca reprova) | `PostgresHealthCheck` (tag `critical`), `RedisHealthCheck` (tag `degraded`, nunca `Unhealthy`) | `HealthTests.Ready_ComTudoUp_RespondeComOsDoisChecksENaoReprova`, `HealthTests.Ready_ComRedisParado_NaoReprova`; casos de falha de Postgres isolados (sem tocar o container compartilhado) em `HealthChecksTests` (unidade) | ✔ |
+| Logs estruturados com `correlationId` e ids de negócio | `AddJsonConsole`, `Activity.SetTag("correlation.id", ...)` no `CorrelationIdMiddleware` | inspeção manual (sem teste automatizado dedicado) | ✔ |
+| Métrica de empréstimos criados | `biblioteca.loans.created{book_id}` | `MetricsTests.CreateLoan_Sucesso_IncrementaLoansCreatedComBookId` | ✔ |
+| Métrica de rejeições por indisponibilidade | `biblioteca.loans.rejected{reason}` | `MetricsTests.CreateLoan_LivroIndisponivel_IncrementaLoansRejectedComReasonUnavailable` | ✔ |
+| Métrica de operações idempotentes repetidas | `biblioteca.idempotency.replayed{endpoint}` | `MetricsTests.CreateLoan_ChaveRepetida_IncrementaIdempotencyReplayed` | ✔ |
+| Métrica de latência do endpoint de empréstimo | `biblioteca.loans.create.duration{outcome}` | Coberta nos três testes de `MetricsTests` acima (asserção do histograma por desfecho) | ✔ |
+| Traces e métricas compatíveis com OpenTelemetry | OTLP (condicional a `OTEL_EXPORTER_OTLP_ENDPOINT`) + instrumentação de ASP.NET Core, HttpClient e Npgsql | — (sem coletor no ambiente local; verificado por inspeção de código) | ✔ |
+
+Simplificação assumida: sem instrumentação de trace dedicada para Redis — o pacote
+`OpenTelemetry.Instrumentation.StackExchangeRedis` da comunidade só existe em
+pré-lançamento hoje (busca via `dotnet package search` sem correspondência estável).
 
 ## 10. Kubernetes
 

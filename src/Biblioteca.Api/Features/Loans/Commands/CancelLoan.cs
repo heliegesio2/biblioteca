@@ -4,6 +4,7 @@ using Biblioteca.Api.Features.Loans.Contracts;
 using Biblioteca.Api.Features.Loans.Domain;
 using Biblioteca.Api.Infrastructure.Caching;
 using Biblioteca.Api.Infrastructure.Cqrs;
+using Biblioteca.Api.Infrastructure.Observability;
 using Biblioteca.Api.Infrastructure.Persistence;
 using FluentValidation;
 using Microsoft.EntityFrameworkCore;
@@ -26,7 +27,8 @@ internal sealed class CancelLoanHandler(
     BibliotecaDbContext dbContext,
     ICacheInvalidationQueue cacheInvalidation,
     IAuditWriter auditWriter,
-    TimeProvider timeProvider)
+    TimeProvider timeProvider,
+    LoanMetrics metrics)
     : ICommandHandler<CancelLoanCommand, LoanResponse>
 {
     public async Task<Result<LoanResponse>> Handle(CancelLoanCommand command, CancellationToken cancellationToken)
@@ -74,6 +76,7 @@ internal sealed class CancelLoanHandler(
         cacheInvalidation.Enqueue(BookCache.BookKey(loan.BookId));
         cacheInvalidation.Enqueue(BookCache.AvailabilityKey(loan.BookId));
 
+        metrics.LoanCancelled();
         return Result<LoanResponse>.Success(new LoanResponse(
             loan.Id, loan.BookId, loan.UserId, nameof(LoanStatus.Cancelled), loan.BorrowedAt, loan.DueAt, null, now));
     }

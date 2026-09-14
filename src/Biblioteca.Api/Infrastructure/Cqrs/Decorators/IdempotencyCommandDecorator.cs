@@ -1,5 +1,7 @@
+using System.Diagnostics;
 using System.Text.Json;
 using Biblioteca.Api.Infrastructure.Idempotency;
+using Biblioteca.Api.Infrastructure.Observability;
 
 namespace Biblioteca.Api.Infrastructure.Cqrs.Decorators;
 
@@ -9,12 +11,19 @@ namespace Biblioteca.Api.Infrastructure.Cqrs.Decorators;
 ///
 /// Comandos que não implementam <see cref="IIdempotentCommand"/> passam direto — hoje só
 /// <c>CreateLoanCommand</c> implementa. Ver docs/idempotency.md para o protocolo completo.
+///
+/// Também é onde `biblioteca.idempotency.replayed` e `biblioteca.loans.create.duration`
+/// são medidos (docs/observability.md#métricas): como só CreateLoanCommand é idempotente
+/// hoje, este decorator genérico é, na prática, o ponto de medição do endpoint de
+/// empréstimo inteiro — se um segundo comando idempotente aparecer, a métrica de duração
+/// precisa se tornar específica de Loans em vez de viver aqui.
 /// </summary>
 internal sealed class IdempotencyCommandDecorator<TCommand, TResult>(
     ICommandHandler<TCommand, TResult> inner,
     IdempotencyStore store,
     TimeProvider timeProvider,
-    IIdempotencyReplayAccessor replayAccessor)
+    IIdempotencyReplayAccessor replayAccessor,
+    LoanMetrics metrics)
     : ICommandHandler<TCommand, TResult>
     where TCommand : ICommand<TResult>
 {
@@ -32,6 +41,7 @@ internal sealed class IdempotencyCommandDecorator<TCommand, TResult>(
 
         var requestHash = ComputeRequestHash(command);
         var now = timeProvider.GetUtcNow();
+        var stopwatch = Stopwatch.StartNew();
 
         var reservation = await store.ReserveAsync(
             idempotentCommand.IdempotencyKey, typeof(TCommand).Name, requestHash, now, cancellationToken);
@@ -46,6 +56,8 @@ internal sealed class IdempotencyCommandDecorator<TCommand, TResult>(
 
             case IdempotencyOutcome.Replayed:
                 replayAccessor.WasReplayed = true;
+                metrics.IdempotencyReplayed(typeof(TCommand).Name);
+                metrics.RecordCreateDuration(stopwatch.Elapsed.TotalMilliseconds, "replayed");
                 return Result<TResult>.Success(JsonSerializer.Deserialize<TResult>(reservation.Entry.ResponseBody!)!);
 
             case IdempotencyOutcome.Reserved:
@@ -64,6 +76,7 @@ internal sealed class IdempotencyCommandDecorator<TCommand, TResult>(
                 // Falha de negócio: nada a fazer aqui — o TransactionCommandDecorator dá
                 // rollback na transação inteira, e a chave InProgress some junto
                 // (docs/idempotency.md#interação-com-rejeições-de-negócio).
+                metrics.RecordCreateDuration(stopwatch.Elapsed.TotalMilliseconds, result.IsSuccess ? "created" : "rejected");
                 return result;
         }
     }

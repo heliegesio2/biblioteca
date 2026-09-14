@@ -36,6 +36,15 @@
     <!-- src/Biblioteca.Api — fase 7 (segurança) -->
     <PackageVersion Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.12" />
 
+    <!-- src/Biblioteca.Api — fase 8 (observabilidade). Sem instrumentação dedicada de
+         Redis: o pacote da comunidade (opentelemetry-dotnet-contrib) só existe em
+         pré-lançamento hoje — limitação anotada em docs/observability.md. -->
+    <PackageVersion Include="OpenTelemetry.Extensions.Hosting" Version="1.18.0" />
+    <PackageVersion Include="OpenTelemetry.Instrumentation.AspNetCore" Version="1.18.0" />
+    <PackageVersion Include="OpenTelemetry.Instrumentation.Http" Version="1.18.0" />
+    <PackageVersion Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="1.18.0" />
+    <PackageVersion Include="Npgsql.OpenTelemetry" Version="10.0.3" />
+
     <!-- tests/* — fase 0 -->
     <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
     <PackageVersion Include="xunit" Version="2.9.3" />

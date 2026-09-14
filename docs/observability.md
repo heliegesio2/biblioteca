@@ -75,10 +75,16 @@ do cliente Redis.
 
 ## Traces
 
-OpenTelemetry com instrumentação automática de ASP.NET Core, `HttpClient`, **Npgsql** e
-StackExchange.Redis. Exportação OTLP, configurada por `OTEL_EXPORTER_OTLP_ENDPOINT`;
-**vazio significa desligado**, que é o default local — não é preciso ter coletor,
-Jaeger ou conta de vendor para rodar o projeto.
+OpenTelemetry com instrumentação automática de ASP.NET Core, `HttpClient` e **Npgsql**.
+Exportação OTLP, configurada por `OTEL_EXPORTER_OTLP_ENDPOINT`; **vazio significa
+desligado**, que é o default local — não é preciso ter coletor, Jaeger ou conta de
+vendor para rodar o projeto.
+
+Sem instrumentação de trace dedicada para StackExchange.Redis: o pacote da comunidade
+(`OpenTelemetry.Instrumentation.StackExchangeRedis`, opentelemetry-dotnet-contrib) só
+existe em pré-lançamento hoje. As chamadas ao Redis continuam visíveis indiretamente
+pelos spans do ASP.NET Core (duração do request) e por `biblioteca.cache.invalidation.failed`
+quando falham.
 
 Spans próprios são criados onde a leitura do trace precisa de mais do que o SQL mostra:
 

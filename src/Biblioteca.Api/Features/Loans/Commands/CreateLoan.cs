@@ -4,6 +4,7 @@ using Biblioteca.Api.Features.Loans.Contracts;
 using Biblioteca.Api.Features.Loans.Domain;
 using Biblioteca.Api.Infrastructure.Caching;
 using Biblioteca.Api.Infrastructure.Cqrs;
+using Biblioteca.Api.Infrastructure.Observability;
 using Biblioteca.Api.Infrastructure.Persistence;
 using FluentValidation;
 using Microsoft.EntityFrameworkCore;
@@ -34,7 +35,8 @@ internal sealed class CreateLoanHandler(
     ICacheInvalidationQueue cacheInvalidation,
     IAuditWriter auditWriter,
     LoanPolicy loanPolicy,
-    TimeProvider timeProvider)
+    TimeProvider timeProvider,
+    LoanMetrics metrics)
     : ICommandHandler<CreateLoanCommand, LoanResponse>
 {
     public async Task<Result<LoanResponse>> Handle(CreateLoanCommand command, CancellationToken cancellationToken)
@@ -69,6 +71,7 @@ internal sealed class CreateLoanHandler(
 
         if (eligibility != LoanEligibility.Allowed)
         {
+            metrics.LoanRejected(MapRejectionReason(eligibility));
             return MapEligibilityError(eligibility, book.Title);
         }
 
@@ -76,14 +79,22 @@ internal sealed class CreateLoanHandler(
 
         // A decisão de verdade: uma única instrução, condição e efeito juntos. Se 0
         // linhas forem afetadas, não havia exemplar — 409 de negócio, não erro genérico.
+        // rows_affected no span é o atributo mais útil do sistema: distingue "não havia
+        // exemplar" de "algo falhou" sem precisar de log (docs/observability.md#traces).
+        using var decrementActivity = BibliotecaActivitySource.Instance.StartActivity("loan.decrement_availability");
+        decrementActivity?.SetTag("book.id", command.BookId);
+
         var affected = await dbContext.Books
             .Where(b => b.Id == command.BookId && b.IsActive && b.AvailableCopies > 0)
             .ExecuteUpdateAsync(s => s
                 .SetProperty(b => b.AvailableCopies, b => b.AvailableCopies - 1)
                 .SetProperty(b => b.UpdatedAt, now), cancellationToken);
 
+        decrementActivity?.SetTag("rows_affected", affected);
+
         if (affected == 0)
         {
+            metrics.LoanRejected("unavailable");
             return new Error("book-unavailable", "Não há exemplar disponível",
                 $"O livro '{book.Title}' não possui exemplares disponíveis no momento.", StatusCodes.Status409Conflict);
         }
@@ -108,6 +119,7 @@ internal sealed class CreateLoanHandler(
         cacheInvalidation.Enqueue(BookCache.BookKey(book.Id));
         cacheInvalidation.Enqueue(BookCache.AvailabilityKey(book.Id));
 
+        metrics.LoanCreated(book.Id);
         return Result<LoanResponse>.Success(ToResponse(loan));
     }
 
@@ -123,6 +135,18 @@ internal sealed class CreateLoanHandler(
             $"O usuário já tem um empréstimo ativo do livro '{bookTitle}'.", StatusCodes.Status409Conflict),
         LoanEligibility.BookUnavailable => new Error("book-unavailable", "Não há exemplar disponível",
             $"O livro '{bookTitle}' não possui exemplares disponíveis no momento.", StatusCodes.Status409Conflict),
+        _ => throw new ArgumentOutOfRangeException(nameof(eligibility), eligibility, null),
+    };
+
+    // Tags de docs/observability.md#métricas (`reason`), independentes do código de erro
+    // HTTP (que é contrato de API e não pode mudar de formato por conveniência de métrica).
+    private static string MapRejectionReason(LoanEligibility eligibility) => eligibility switch
+    {
+        LoanEligibility.UserInactive => "user_inactive",
+        LoanEligibility.BookInactive => "book_inactive",
+        LoanEligibility.UserLoanLimitReached => "limit_exceeded",
+        LoanEligibility.DuplicateActiveLoan => "duplicate_active_loan",
+        LoanEligibility.BookUnavailable => "unavailable",
         _ => throw new ArgumentOutOfRangeException(nameof(eligibility), eligibility, null),
     };
 

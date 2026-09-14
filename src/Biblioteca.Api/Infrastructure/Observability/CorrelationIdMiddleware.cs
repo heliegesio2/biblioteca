@@ -1,3 +1,5 @@
+using System.Diagnostics;
+
 namespace Biblioteca.Api.Infrastructure.Observability;
 
 /// <summary>
@@ -19,6 +21,7 @@ public sealed class CorrelationIdMiddleware(RequestDelegate next)
         context.Items[HeaderName] = correlationId;
         context.Response.Headers[HeaderName] = correlationId;
         correlationIdAccessor.CorrelationId = correlationId;
+        Activity.Current?.SetTag("correlation.id", correlationId);
 
         await next(context);
     }

@@ -11,13 +11,19 @@ using Biblioteca.Api.Infrastructure.Cqrs;
 using Biblioteca.Api.Infrastructure.Http;
 using Biblioteca.Api.Infrastructure.Idempotency;
 using Biblioteca.Api.Infrastructure.Observability;
+using Biblioteca.Api.Infrastructure.Observability.HealthChecks;
 using Biblioteca.Api.Infrastructure.Persistence;
 using FluentValidation;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Hybrid;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.IdentityModel.Tokens;
+using OpenTelemetry.Metrics;
+using OpenTelemetry.Resources;
+using OpenTelemetry.Trace;
 
 var builder = WebApplication.CreateBuilder(args);
 var apiAssembly = typeof(Program).Assembly;
@@ -142,6 +148,48 @@ builder.Services.AddSingleton<IAuthorizationHandler, SameUserOrLibrarianHandler>
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<ICurrentActor, CurrentActor>();
 
+// Observabilidade (fase 8, docs/observability.md). Logs JSON puro em stdout — sem
+// arquivo, sem agente no container; o coletor do cluster lê stdout em Kubernetes.
+builder.Logging.AddJsonConsole();
+
+builder.Services.AddSingleton<LoanMetrics>();
+
+// OTEL_EXPORTER_OTLP_ENDPOINT vazio (o default local) desliga a exportação OTLP sem
+// exigir coletor/Jaeger/conta de vendor para rodar o projeto — traces e métricas
+// continuam sendo produzidos, só não saem do processo.
+var otlpEndpoint = builder.Configuration["OTEL_EXPORTER_OTLP_ENDPOINT"];
+builder.Services.AddOpenTelemetry()
+    .ConfigureResource(resource => resource.AddService("Biblioteca.Api"))
+    .WithTracing(tracing =>
+    {
+        tracing.AddAspNetCoreInstrumentation()
+            .AddHttpClientInstrumentation()
+            .AddSource(BibliotecaActivitySource.Name);
+        Npgsql.TracerProviderBuilderExtensions.AddNpgsql(tracing);
+        if (!string.IsNullOrEmpty(otlpEndpoint))
+        {
+            tracing.AddOtlpExporter();
+        }
+    })
+    .WithMetrics(metrics =>
+    {
+        metrics.AddAspNetCoreInstrumentation()
+            .AddHttpClientInstrumentation()
+            .AddMeter(LoanMetrics.MeterName)
+            .AddMeter("Npgsql");
+        if (!string.IsNullOrEmpty(otlpEndpoint))
+        {
+            metrics.AddOtlpExporter();
+        }
+    });
+
+// /health/live não consulta nada externo (nenhum check registrado é executado ali) —
+// senão uma indisponibilidade do Postgres faria o kubelet reiniciar todos os pods em
+// loop. /health/ready reprova só por "critical"; Redis "degraded" nunca reprova.
+builder.Services.AddHealthChecks()
+    .AddCheck<PostgresHealthCheck>("postgres", tags: ["critical"])
+    .AddCheck<RedisHealthCheck>("redis", tags: ["degraded"]);
+
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
@@ -166,6 +214,13 @@ app.MapCatalogEndpoints();
 app.MapUserEndpoints();
 app.MapLoanEndpoints();
 app.MapAuditEndpoints();
+
+// Anônimos (um probe não carrega JWT). "live" não executa nenhum check registrado —
+// só confirma que o pipeline responde.
+app.MapHealthChecks("/health/live", new HealthCheckOptions { Predicate = _ => false })
+    .AllowAnonymous();
+app.MapHealthChecks("/health/ready", new HealthCheckOptions { ResponseWriter = HealthReportWriter.WriteAsync })
+    .AllowAnonymous();
 
 // POST /auth/token não existe em Production — não há identity provider de mentira em
 // tráfego real (docs/security.md#post-authtoken).

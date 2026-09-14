@@ -3,6 +3,7 @@ using Biblioteca.Api.Features.Catalog;
 using Biblioteca.Api.Features.Loans;
 using Biblioteca.Api.Features.Loans.Domain;
 using Biblioteca.Api.Features.Users;
+using Biblioteca.Api.Infrastructure.Caching;
 using Biblioteca.Api.Infrastructure.Cqrs;
 using Biblioteca.Api.Infrastructure.Http;
 using Biblioteca.Api.Infrastructure.Idempotency;
@@ -10,6 +11,7 @@ using Biblioteca.Api.Infrastructure.Observability;
 using Biblioteca.Api.Infrastructure.Persistence;
 using FluentValidation;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Hybrid;
 
 var builder = WebApplication.CreateBuilder(args);
 var apiAssembly = typeof(Program).Assembly;
@@ -41,6 +43,22 @@ builder.Services.Configure<IdempotencyOptions>(builder.Configuration.GetSection(
 builder.Services.AddScoped<IdempotencyStore>();
 builder.Services.AddScoped<IIdempotencyReplayAccessor, IdempotencyReplayAccessor>();
 builder.Services.AddHostedService<IdempotencyCleanupService>();
+
+// Cache (fase 5): Redis como L2, memória do processo como L1 — o cache nunca decide
+// nada, só serve leitura (docs/caching.md). TTL/expiração local por chamada específica
+// (GetAvailability) sobrescrevem o default abaixo, que vale para o livro (GetBookById).
+builder.Services.Configure<CacheOptions>(builder.Configuration.GetSection("Cache"));
+builder.Services.AddStackExchangeRedisCache(options =>
+    options.Configuration = builder.Configuration.GetConnectionString("Redis"));
+builder.Services.AddHybridCache(options =>
+{
+    var bookTtlSeconds = builder.Configuration.GetValue("Cache:BookTtlSeconds", 300);
+    options.DefaultEntryOptions = new HybridCacheEntryOptions
+    {
+        Expiration = TimeSpan.FromSeconds(bookTtlSeconds),
+        LocalCacheExpiration = TimeSpan.FromSeconds(5),
+    };
+});
 
 var app = builder.Build();
 

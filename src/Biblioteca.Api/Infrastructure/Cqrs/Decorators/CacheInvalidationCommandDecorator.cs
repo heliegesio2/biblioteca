@@ -1,4 +1,5 @@
 using Biblioteca.Api.Infrastructure.Caching;
+using Microsoft.Extensions.Caching.Hybrid;
 
 namespace Biblioteca.Api.Infrastructure.Cqrs.Decorators;
 
@@ -8,14 +9,11 @@ namespace Biblioteca.Api.Infrastructure.Cqrs.Decorators;
 /// (está mais "fora" no pipeline), quando chegamos aqui o commit já aconteceu. Invalidar
 /// antes do commit deixaria uma leitura concorrente repopular o cache com o valor antigo
 /// (ADR-0007).
-///
-/// A invalidação de fato no Redis/HybridCache chega na fase 5 (docs/caching.md); por ora
-/// só drenamos e registramos a intenção, para que os handlers já possam enfileirar chaves
-/// desde já sem esperar o cache existir.
 /// </summary>
 internal sealed class CacheInvalidationCommandDecorator<TCommand, TResult>(
     ICommandHandler<TCommand, TResult> inner,
     ICacheInvalidationQueue queue,
+    HybridCache cache,
     ILogger<CacheInvalidationCommandDecorator<TCommand, TResult>> logger)
     : ICommandHandler<TCommand, TResult>
     where TCommand : ICommand<TResult>
@@ -28,9 +26,22 @@ internal sealed class CacheInvalidationCommandDecorator<TCommand, TResult>(
         {
             var keys = queue.DrainPending();
 
-            if (keys.Count > 0)
+            foreach (var key in keys)
             {
-                logger.LogDebug("Invalidação de cache pendente para as chaves {CacheKeys}", keys);
+                try
+                {
+                    // CancellationToken.None: o commit já aconteceu; o cliente desistir
+                    // da requisição não pode deixar uma chave velha no cache.
+                    await cache.RemoveAsync(key, CancellationToken.None);
+                }
+                catch (Exception ex)
+                {
+                    // Registrada e contada (biblioteca.cache.invalidation.failed na fase
+                    // 8), mas nunca reverte a transação — o efeito já commitou, e desfazê-lo
+                    // por causa do cache trocaria um problema de latência por um de
+                    // corretude. O TTL curto limita a exposição (docs/caching.md).
+                    logger.LogWarning(ex, "Falha ao invalidar a chave de cache {CacheKey}", key);
+                }
             }
         }
 

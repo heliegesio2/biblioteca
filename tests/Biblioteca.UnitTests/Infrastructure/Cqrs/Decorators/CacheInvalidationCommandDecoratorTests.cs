@@ -1,12 +1,23 @@
 using Biblioteca.Api.Infrastructure.Caching;
 using Biblioteca.Api.Infrastructure.Cqrs;
 using Biblioteca.Api.Infrastructure.Cqrs.Decorators;
+using Microsoft.Extensions.Caching.Hybrid;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Biblioteca.UnitTests.Infrastructure.Cqrs.Decorators;
 
 public sealed class CacheInvalidationCommandDecoratorTests
 {
+    // HybridCache sem AddStackExchangeRedisCache funciona só com L1 (memória) — real o
+    // bastante para testar a drenagem sem precisar de Redis.
+    private static HybridCache CreateInMemoryHybridCache()
+    {
+        var services = new ServiceCollection();
+        services.AddHybridCache();
+        return services.BuildServiceProvider().GetRequiredService<HybridCache>();
+    }
+
     private sealed class SpyCacheInvalidationQueue : ICacheInvalidationQueue
     {
         private readonly List<string> _enqueued = [];
@@ -43,6 +54,7 @@ public sealed class CacheInvalidationCommandDecoratorTests
         var decorator = new CacheInvalidationCommandDecorator<FakeCommand, string>(
             new EnqueueingCommandHandler(queue, succeed: true),
             queue,
+            CreateInMemoryHybridCache(),
             NullLogger<CacheInvalidationCommandDecorator<FakeCommand, string>>.Instance);
 
         var result = await decorator.Handle(new FakeCommand("x"), CancellationToken.None);
@@ -58,6 +70,7 @@ public sealed class CacheInvalidationCommandDecoratorTests
         var decorator = new CacheInvalidationCommandDecorator<FakeCommand, string>(
             new EnqueueingCommandHandler(queue, succeed: false),
             queue,
+            CreateInMemoryHybridCache(),
             NullLogger<CacheInvalidationCommandDecorator<FakeCommand, string>>.Instance);
 
         var result = await decorator.Handle(new FakeCommand("x"), CancellationToken.None);

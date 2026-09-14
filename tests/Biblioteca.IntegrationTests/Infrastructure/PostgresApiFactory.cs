@@ -103,12 +103,13 @@ public sealed class PostgresApiFactory : WebApplicationFactory<Program>, IAsyncL
             next(app);
 
             app.UseEndpoints(endpoints => endpoints.MapPost(
-                "/__selftest/ping",
-                async (PingCommand command, IDispatcher dispatcher, CancellationToken ct) =>
-                {
-                    var result = await dispatcher.Send(command, ct);
-                    return result.ToHttpResult(value => Results.Ok(value));
-                }));
+                    "/__selftest/ping",
+                    async (PingCommand command, IDispatcher dispatcher, CancellationToken ct) =>
+                    {
+                        var result = await dispatcher.Send(command, ct);
+                        return result.ToHttpResult(value => Results.Ok(value));
+                    })
+                .AllowAnonymous()); // fase 7: sem isto, a fallback policy (autenticado por padrão) bloquearia
         };
     }
 }

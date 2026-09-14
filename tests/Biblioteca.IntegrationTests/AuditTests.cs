@@ -41,7 +41,7 @@ public sealed class AuditTests(PostgresApiFactory factory) : IntegrationTestBase
         Assert.Equal(correlationId, created.CorrelationId);
         Assert.Equal(DateTimeKind.Utc, created.OccurredAt.UtcDateTime.Kind);
         Assert.True(created.OccurredAt >= beforeCall);
-        Assert.Equal("system", created.Actor); // ator real (JWT) chega na fase 7
+        Assert.Equal(DefaultActor, created.Actor); // e-mail do JWT, não mais "system" (fase 7)
     }
 
     [Fact]
@@ -102,11 +102,11 @@ public sealed class AuditTests(PostgresApiFactory factory) : IntegrationTestBase
     [Fact]
     public async Task FiltroPorActor_RetornaSoEventosDaquelaIdentidade()
     {
-        // Sem autenticação (fase 7), todo evento tem actor = "system" — o filtro em si
-        // já funciona; este teste prova que ele reduz corretamente o conjunto.
+        // O actor real (fase 7) é o e-mail do JWT de quem chamou — DefaultActor é o do
+        // Client (librarian) da fixture.
         var bookId = await CreateBookAsync();
 
-        var matching = await GetAuditEventsAsync(actor: "system");
+        var matching = await GetAuditEventsAsync(actor: DefaultActor);
         var nonMatching = await GetAuditEventsAsync(actor: "outra-pessoa@example.com");
 
         Assert.Contains(matching.Items, e => e.EntityId == bookId);

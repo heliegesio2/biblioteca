@@ -75,6 +75,7 @@ app.UseHttpsRedirection();
 app.MapCatalogEndpoints();
 app.MapUserEndpoints();
 app.MapLoanEndpoints();
+app.MapAuditEndpoints();
 
 app.Run();
 

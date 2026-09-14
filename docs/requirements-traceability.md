@@ -23,7 +23,7 @@ Legenda: ✅ documentado e planejado · 🔨 em implementação · ✔ concluíd
 | Registrar data do empréstimo e prevista de devolução | `borrowed_at`, `due_at` (`Loans:LoanPeriodDays`) | `LoanPolicyTests.ComputeDueAt_SomaOPrazoConfigurado`, `CreateLoanTests.CaminhoFeliz_Retorna201ComDueAtCorreto` | ✔ |
 | Devolver empréstimo | `POST /loans/{id}/return` | `LoanHistoryTests`, `IdempotencyTests` | ✔ |
 | Cancelar preservando a informação de que existiu | `POST /loans/{id}/cancel` → status `Cancelled`, linha preservada | `LoanHistoryTests` | ✔ |
-| Consultar disponibilidade atual | `GET /books/{id}/availability` (cache chega na fase 5) | `LoanHistoryTests` | ✔ |
+| Consultar disponibilidade atual | `GET /books/{id}/availability` (cacheado, TTL 30s) | `LoanHistoryTests`, `CacheTests` | ✔ |
 | Histórico por livro e por usuário | `GET /books/{id}/history`, `GET /users/{id}/loans` | `LoanHistoryTests` | ✔ |
 
 ## 3. Concorrência e consistência
@@ -62,9 +62,10 @@ Legenda: ✅ documentado e planejado · 🔨 em implementação · ✔ concluíd
 
 | Requisito | Implementação | Teste | Status |
 |---|---|---|---|
-| Redis em ao menos uma consulta de leitura | `GET /books/{id}` e `GET /books/{id}/availability` via `HybridCache` | `CacheTests` | ✅ |
-| Invalidar/atualizar coerentemente em empréstimo, devolução e alteração de quantidade | Invalidação explícita **pós-commit** por `CacheInvalidationDecorator` | `CacheTests.Loan_InvalidatesAvailability` e afins | ✅ |
-| PostgreSQL como fonte de verdade para decisão | O caminho de escrita nunca lê o cache | `LastCopyConcurrencyTests` (correto mesmo com cache quente) | ✅ |
+| Redis em ao menos uma consulta de leitura | `GET /books/{id}` e `GET /books/{id}/availability` via `HybridCache` | `CacheTests` | ✔ |
+| Invalidar/atualizar coerentemente em empréstimo, devolução e alteração de quantidade | Invalidação explícita **pós-commit** por `CacheInvalidationCommandDecorator` | `CacheTests.Loan_InvalidatesAvailability`, `Return_InvalidatesAvailability`, `PatchBook_InvalidatesBook` | ✔ |
+| PostgreSQL como fonte de verdade para decisão | O caminho de escrita nunca lê o cache | `LastCopyConcurrencyTests` (correto mesmo com cache quente) | ✔ |
+| Redis fora do ar degrada, não derruba | Leitura embrulhada em try/catch, cai para o banco | `CacheTests.RedisDown_ReadsStillWork` | ✔ |
 
 ## 7. API e configuração
 

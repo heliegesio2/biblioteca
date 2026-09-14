@@ -68,7 +68,18 @@ Legenda: ✅ documentado e planejado · 🔨 em implementação · ✔ concluíd
 | PostgreSQL como fonte de verdade para decisão | O caminho de escrita nunca lê o cache | `LastCopyConcurrencyTests` (correto mesmo com cache quente) | ✔ |
 | Redis fora do ar degrada, não derruba | Leitura embrulhada em try/catch, cai para o banco | `CacheTests.RedisDown_ReadsStillWork` | ✔ |
 
-## 7. API e configuração
+## 7. Segurança
+
+| Requisito | Implementação | Teste | Status |
+|---|---|---|---|
+| Autenticação com ator para a auditoria | JWT Bearer (`sub`/`email`/`role`); `POST /auth/token` fora de Production ([security.md](security.md#autenticação)) | `AuthorizationTests`, `AuditTests` | ✔ |
+| Papéis `librarian`/`member` | Policy `Librarian` por papel; fallback exige usuário autenticado por padrão | `AuthorizationTests` | ✔ |
+| Acesso a recurso de terceiro (`member` só o próprio) | `SameUserOrLibrarianRequirement`, autorização por recurso nos endpoints | `AuthorizationTests.Member_NaoConsegueVerEmprestimosDeOutroUsuario` e afins | ✔ |
+| Ator real (não `"system"`) chegando à auditoria | `ICurrentActor` a partir do claim `email` | `AuditTests.CreateBook_GeraEventoBookCreated_ComCorrelationIdEUtc` | ✔ |
+| Recusa subir em Production com chave fraca ou de desenvolvimento | Checagem em `Program.cs` (< 32 bytes ou igual à chave dev) | — (exigiria rodar de fato com `ASPNETCORE_ENVIRONMENT=Production`) | ✔ |
+| Nenhum segredo real versionado | Só a chave de desenvolvimento em `appsettings.Development.json`, marcada como tal | — | ✔ |
+
+## 8. API e configuração
 
 | Requisito | Implementação | Status |
 |---|---|---|
@@ -78,7 +89,7 @@ Legenda: ✅ documentado e planejado · 🔨 em implementação · ✔ concluíd
 | Não versionar segredos | Só credenciais locais do Compose; `Secret` referenciado por nome no Helm ([security.md](security.md#segredos)) | ✅ |
 | Migrations versionadas | `Infrastructure/Persistence/Migrations/` no Git | ✅ |
 
-## 8. Health checks e telemetria
+## 9. Health checks e telemetria
 
 | Requisito | Implementação | Teste | Status |
 |---|---|---|---|
@@ -91,7 +102,7 @@ Legenda: ✅ documentado e planejado · 🔨 em implementação · ✔ concluíd
 | Métrica de latência do endpoint de empréstimo | `biblioteca.loans.create.duration{outcome}` | `MetricsTests` | ✅ |
 | Traces e métricas compatíveis com OpenTelemetry | OTLP + instrumentação de ASP.NET Core, Npgsql e Redis | — | ✅ |
 
-## 9. Kubernetes
+## 10. Kubernetes
 
 | Requisito | Implementação | Status |
 |---|---|---|
@@ -102,7 +113,7 @@ Legenda: ✅ documentado e planejado · 🔨 em implementação · ✔ concluíd
 | Liveness e readiness probes | `/health/live`, `/health/ready` | ✅ |
 | README explica corretude entre 2 e 11 réplicas | [README §8.6](../README.md#86-corretude-entre-2-e-11-réplicas) + [operations.md](operations.md#de-2-a-11-réplicas) | ✅ |
 
-## 10. Endpoints mínimos
+## 11. Endpoints mínimos
 
 | Endpoint sugerido | Situação |
 |---|---|
@@ -112,9 +123,9 @@ Legenda: ✅ documentado e planejado · 🔨 em implementação · ✔ concluíd
 | `GET /books/{id}/availability`, `GET /books/{id}/history` | ✔ |
 | `GET /audit-events` | ✔ |
 | `GET /health/live`, `GET /health/ready` | ✅ |
-| **Acréscimo**: `POST /auth/token` | ✅ — necessário para o `actor` da auditoria ([security.md](security.md)) |
+| **Acréscimo**: `POST /auth/token` | ✔ — necessário para o `actor` da auditoria ([security.md](security.md)), fora de Production |
 
-## 11. Testes mínimos
+## 12. Testes mínimos
 
 | Requisito | Teste | Status |
 |---|---|---|
@@ -124,7 +135,7 @@ Legenda: ✅ documentado e planejado · 🔨 em implementação · ✔ concluíd
 | Idempotência | `IdempotencyTests` | ✔ |
 | Preservação de histórico após devolução/cancelamento | `LoanHistoryTests` | ✔ |
 
-## 12. README esperado
+## 13. README esperado
 
 | Item | Seção |
 |---|---|
